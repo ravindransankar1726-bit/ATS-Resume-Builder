@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resume Builder + ATS Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="v2.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ================= AUTH PAGE ================= -->
+<div id="page-auth" class="page">
+  <div class="auth-card">
+    <div class="auth-brand"><div class="mark">ATS</div><h1>ATS Resume Builder</h1></div>
+    <div class="auth-tabs">
+      <button id="tabLogin" class="active" onclick="switchAuthTab('login')">Log in</button>
+      <button id="tabSignup" onclick="switchAuthTab('signup')">Sign up</button>
+    </div>
+
+    <div id="signupNameWrap" style="display:none;">
+      <label>Full name</label>
+      <input type="text" id="auth_name" placeholder="Ravindran S" />
+    </div>
+    <label>Email</label>
+    <input type="text" id="auth_email" placeholder="you@example.com" />
+    <label>Password</label>
+    <div class="pw-wrap"><input type="password" id="auth_password" placeholder="••••••••" /><button type="button" class="pw-eye" onclick="togglePw()">Show</button></div>
+    <div id="confirmWrap" style="display:none;"><label>Confirm password</label><input type="password" id="auth_confirm" placeholder="••••••••" /></div>
+
+    <button class="auth-submit" id="authSubmitBtn" onclick="handleAuthSubmit()">Log in</button>
+    <div class="auth-error" id="authError"></div>
+    <p class="auth-note">Powered by Supabase Auth. If email confirmation is enabled on your project, check your inbox after signing up before logging in.</p>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div id="page-app" class="page" style="display:none;">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand" onclick="goToDashboard()">
+        <div class="mark">ATS</div>
+        <div>
+          <div class="sidebar-brand-name">ATS Resume Builder</div>
+          <div class="sidebar-brand-tag">ATS RESUME PLATFORM</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label">Menu</div>
+      <a class="sidebar-link active" id="sidebarDashLink" onclick="goToDashboard()"><span class="sidebar-icon">🏠</span> Dashboard</a>
+      <a class="sidebar-link" id="sidebarBuilderLink" style="display:none;" onclick="showSidebarBuilderTab()"><span class="sidebar-icon">📝</span> Resume Builder</a>
+      <a class="sidebar-link" id="sidebarAccountLink" onclick="goToAccount()"><span class="sidebar-icon">⚙️</span> Settings</a>
+      <a class="sidebar-link" id="sidebarFeedbackLink" onclick="goToFeedback()"><span class="sidebar-icon">💬</span> Feedback</a>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar" id="sidebarAvatar">U</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebarUserName">User</div>
+          <div class="sidebar-user-role">ATS Resume Builder Account</div>
+        </div>
+      </div>
+      <button class="sidebar-logout" id="darkModeToggle" onclick="toggleDarkMode()" style="margin-bottom:8px;"><span class="sidebar-icon" id="darkModeIcon">🌙</span> Dark Mode</button>
+      <button class="sidebar-logout" onclick="logout()"><span class="sidebar-icon">⎋</span> Sign Out</button>
+    </aside>
+
+    <div class="main-content">
+    <div class="app">
+
+    <!-- ---- DASHBOARD ---- -->
+    <div id="page-dashboard">
+      <div class="dash-head">
+        <div>
+          <h2 id="dashGreeting">Welcome</h2>
+          <p class="sub">Manage your resumes and track your progress</p>
+        </div>
+        <button class="new-btn" onclick="createNewResume()">+ Create Resume</button>
+      </div>
+      <div class="stat-row" id="statRow"></div>
+      <div class="dash-section-title">Your Resumes</div>
+      <div class="resume-grid" id="resumeGrid"></div>
+    </div>
+
+    <!-- ---- SETTINGS ---- -->
+    <div id="page-account" style="display:none;">
+      <div class="dash-head">
+        <div>
+          <h2>Settings</h2>
+          <p class="sub">Your profile and account details.</p>
+        </div>
+      </div>
+      <div class="panel" style="max-width:480px;">
+        <h2>Profile</h2>
+        <label>Display name</label>
+        <input type="text" id="account_name" />
+        <label>Email</label>
+        <input type="text" id="account_email" disabled />
+        <button class="btn-secondary" style="margin-top:14px;" onclick="updateAccountName()">Save changes</button>
+        <p class="sub" id="accountSaveMsg" style="margin-top:10px;"></p>
+      </div>
+      <div class="panel" style="max-width:480px;margin-top:16px;border-color:var(--coral);">
+      </div>
+    </div>
+
+    <!-- ---- FEEDBACK ---- -->
+    <div id="page-feedback" style="display:none;">
+      <div class="dash-head">
+        <div>
+          <h2>Feedback</h2>
+          <p class="sub">Tell us what you think of the app — your rating and comments help improve it.</p>
+        </div>
+      </div>
+      <div class="panel" style="max-width:520px;">
+        <h2>Rate your experience</h2>
+        <p class="sub">Pick a star rating and leave a comment (optional).</p>
+        <div class="star-row" id="feedbackStars">
+          <button type="button" class="star-btn" data-val="1" onclick="setFeedbackStars(1)">★</button>
+          <button type="button" class="star-btn" data-val="2" onclick="setFeedbackStars(2)">★</button>
+          <button type="button" class="star-btn" data-val="3" onclick="setFeedbackStars(3)">★</button>
+          <button type="button" class="star-btn" data-val="4" onclick="setFeedbackStars(4)">★</button>
+          <button type="button" class="star-btn" data-val="5" onclick="setFeedbackStars(5)">★</button>
+        </div>
+        <label>Comments</label>
+        <textarea id="feedbackComment" class="big" placeholder="What's working well? What should we fix or add?"></textarea>
+        <button class="btn-secondary" style="margin-top:14px;" onclick="submitFeedback()">Send Feedback</button>
+        <p class="sub" id="feedbackMsg" style="margin-top:10px;"></p>
+      </div>
+      <div class="panel" style="max-width:520px;margin-top:16px;">
+        <h2>Your previous feedback</h2>
+        <div id="feedbackHistory"><p class="sub">No feedback submitted yet.</p></div>
+      </div>
+    </div>
+
+    <!-- ---- BUILDER ---- -->
+    <div id="page-builder" style="display:none;">
+      <div class="builder-topbar">
+        <div>
+          <a class="back-link" onclick="goToDashboard()">← Dashboard</a>
+          <div><input type="text" id="resumeNameInput" class="resume-name-input" value="Untitled Resume" oninput="scheduleAutosave()" /></div>
+        </div>
+        <div class="builder-actions">
+          <span class="save-indicator" id="saveIndicator">Not saved yet</span>
+          <button class="btn-secondary" id="historyBtn" onclick="toggleHistoryPanel()" disabled>📜 History</button>
+          <div class="download-panel" id="historyPanel" style="display:none;">
+            <div class="dl-group"><label class="dl-label">Saved Versions</label></div>
+            <div id="historyList"></div>
+          </div>
+          <button class="btn-secondary" id="shareBtn" onclick="toggleSharePanel()" disabled>🔗 Share</button>
+          <div class="download-panel" id="sharePanel" style="display:none;">
+            <div class="dl-group">
+              <label class="dl-label">Public Link</label>
+              <p class="sub" style="margin:0 0 10px;">Anyone with this link can view a read-only copy of this resume — no login needed.</p>
+              <label class="share-toggle-row"><input type="checkbox" id="shareToggle" onchange="onShareToggle(this.checked)" /> Enable public link</label>
+              <div id="shareLinkBox" style="display:none;margin-top:10px;">
+                <input type="text" id="shareLinkInput" readonly onclick="this.select()" />
+                <button class="dl-confirm" style="margin-top:8px;" onclick="copyShareLink()">📋 Copy Link</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn-secondary" id="downloadBtn" onclick="toggleDownloadPanel()" disabled>⬇ Download ▾</button>
+          <div class="download-panel" id="downloadPanel" style="display:none;">
+            <div class="dl-group">
+              <label class="dl-label">Format</label>
+              <div class="dl-options" id="fmtOptions">
+                <button type="button" class="dl-chip active" data-fmt="pdf" onclick="setDlFormat('pdf')">PDF</button>
+                <button type="button" class="dl-chip" data-fmt="png" onclick="setDlFormat('png')">PNG Image</button>
+                <button type="button" class="dl-chip" data-fmt="txt" onclick="setDlFormat('txt')">Plain Text (.txt)</button>
+              </div>
+            </div>
+            <div class="dl-group" id="dlPageSizeGroup">
+              <label class="dl-label">Page size</label>
+              <div class="dl-options" id="pageSizeOptions">
+                <button type="button" class="dl-chip active" data-size="a4" onclick="setDlPageSize('a4')">A4</button>
+                <button type="button" class="dl-chip" data-size="letter" onclick="setDlPageSize('letter')">US Letter</button>
+                <button type="button" class="dl-chip" data-size="fit" onclick="setDlPageSize('fit')">Fit to Content</button>
+              </div>
+            </div>
+            <div class="dl-group" id="dlMarginGroup">
+              <label class="dl-label">Margin</label>
+              <div class="dl-options" id="marginOptions">
+                <button type="button" class="dl-chip" data-margin="4" onclick="setDlMargin(4)">Narrow</button>
+                <button type="button" class="dl-chip active" data-margin="10" onclick="setDlMargin(10)">Normal</button>
+                <button type="button" class="dl-chip" data-margin="16" onclick="setDlMargin(16)">Wide</button>
+              </div>
+            </div>
+            <button class="dl-confirm" onclick="confirmDownload()">⬇ Download now</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="workflow-strip" id="workflowStrip">
+        <span class="step" data-step="1">Resume</span><span class="arrow">→</span>
+        <span class="step" data-step="2">Job Description</span><span class="arrow">→</span>
+        <span class="step" data-step="3">Engine Scan</span><span class="arrow">→</span>
+        <span class="step" data-step="4">ATS Score</span><span class="arrow">→</span>
+        <span class="step" data-step="5">Suggestions</span><span class="arrow">→</span>
+        <span class="step" data-step="6">Improved Resume</span>
+      </div>
+
+      <div class="grid-input" id="inputStage">
+        <div class="panel">
+          <h2>01 · Build Resume</h2>
+          <p class="sub">Fill this in, then run the ATS scan below to generate your resume + score.</p>
+          <label>Full name</label>
+          <input type="text" id="f_name" value="Ravindran S" />
+          <label>Target title</label>
+          <input type="text" id="f_title" value="Frontend Developer" />
+          <label>Contact info</label>
+          <div class="row2">
+            <input type="text" id="f_email" placeholder="Email" value="ravindran@email.com" />
+            <input type="text" id="f_phone" placeholder="Phone" value="+91 00000 00000" />
+          </div>
+          <div class="row2" style="margin-top:8px;">
+            <input type="text" id="f_location" placeholder="Location" value="Chennai, India" />
+            <input type="text" id="f_linkedin" placeholder="linkedin.com/in/…" value="linkedin.com/in/ravindran" />
+          </div>
+          <input type="text" id="f_github" placeholder="github.com/…" value="github.com/ravindran" style="margin-top:8px;" />
+          <label>Professional summary</label>
+          <textarea id="f_summary" class="big">BCA student with hands-on experience building web applications using HTML, CSS, JavaScript and modern APIs. Interested in frontend development roles.</textarea>
+          <button type="button" class="mini-btn" onclick="generateSummary()">⟳ Auto-generate from title + skills</button>
+          <label>Skills</label>
+          <div class="skills-tags" id="skillTags"></div>
+          <div class="add-skill">
+            <input type="text" id="newSkill" placeholder="Add a skill…" />
+            <button onclick="addSkill()">Add</button>
+          </div>
+          <label>Experience / Project description</label>
+          <textarea id="f_exp" class="big">Created a resume builder website using HTML, CSS and JavaScript. Added login feature for users.</textarea>
+          <button type="button" class="mini-btn" onclick="rewriteExperience()">⟳ Strengthen wording</button>
+          <label>Education</label>
+          <input type="text" id="f_edu" value="BCA, L.N. Government College (Autonomous), Ponneri — 2024–2027" />
+          <label>Certifications</label>
+          <textarea id="f_certs" placeholder="e.g. Full-Stack Web Development — Coursera (2025)">Full-Stack Web Development — Coursera (2025)
+Responsive Web Design — freeCodeCamp (2024)</textarea>
+          <label>Achievements</label>
+          <textarea id="f_achievements" placeholder="e.g. Winner, college hackathon 2025">Winner, college-level hackathon (2025)
+Built and deployed 3 personal web projects</textarea>
+          <label>Internships (Optional)</label>
+          <textarea id="f_internships" placeholder="e.g. Web Development Intern — Company (Jun–Jul 2025)"></textarea>
+          <label>Hobbies &amp; Interests</label>
+          <input type="text" id="f_hobbies" placeholder="e.g. Coding, Reading, Photography" />
+          <label>Languages</label>
+          <input type="text" id="f_languages" placeholder="e.g. English, Tamil" value="English, Tamil" />
+        </div>
+
+        <div class="panel">
+          <h2>02 · Paste Job Description</h2>
+          <p class="sub">Paste the JD you're targeting, then run the scan — your resume and ATS score will appear below.</p>
+          <div class="jd-box">
+            <textarea id="f_jd" class="big" style="min-height:170px;" placeholder="Paste job description here…">We are hiring a Frontend Developer with strong skills in React, JavaScript, HTML, CSS, Git, and REST APIs. Experience with responsive design, Tailwind CSS, and version control is required. Should be able to collaborate with backend teams and write clean, maintainable code. Familiarity with Node.js is a plus.</textarea>
+          </div>
+          <button class="scan-btn" id="scanBtn" onclick="runScan()"><span id="scanBtnText">Run ATS Scan</span></button>
+          <p class="sub" style="margin-top:14px;margin-bottom:0;">Pick a template — applies once your resume appears below.</p>
+          <div class="tpl-row" id="tplRow" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div id="resultsWrapper" style="display:none;">
+        <div class="results-topbar">
+          <a class="back-link" onclick="backToEdit()">← Back to Edit</a>
+        </div>
+        <div class="grid-results" id="resultsStage">
+          <div>
+            <div class="preview-wrap tpl-ats" id="previewWrap">
+              <div class="r-header" style="display:none;">
+                <p class="r-name" id="p_name_modern"></p>
+                <p class="r-title" id="p_title_modern"></p>
+                <p class="r-contact-inline" id="p_contact_modern"></p>
+              </div>
+              <div class="r-inner">
+                <p class="r-name" id="p_name">Ravindran S</p>
+                <p class="r-title" id="p_title">FRONTEND DEVELOPER</p>
+                <p class="r-contact" id="p_contact"></p>
+                <p class="r-links" id="p_links"></p>
+                <div class="r-section"><h3>Summary</h3><p id="p_summary"></p></div>
+                <div class="r-section"><h3>Skills</h3><div class="r-skills-line" id="p_skills"></div></div>
+                <div class="r-section"><h3>Experience / Projects</h3><p id="p_exp"></p></div>
+                <div class="r-section"><h3>Education</h3><p id="p_edu"></p></div>
+                <div class="r-section" id="s_certs"><h3>Certifications</h3><p id="p_certs"></p></div>
+                <div class="r-section" id="s_internships"><h3>Internships</h3><p id="p_internships"></p></div>
+                <div class="r-section" id="s_achievements"><h3>Achievements</h3><p id="p_achievements"></p></div>
+                <div class="r-section" id="s_hobbies"><h3>Hobbies &amp; Interests</h3><p id="p_hobbies"></p></div>
+                <div class="r-section" id="s_languages"><h3>Languages</h3><p id="p_languages"></p></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" id="analysisPanel">
+            <h2>03–05 · ATS Analysis</h2>
+            <p class="sub">Score, keyword match, grammar check & one-click fixes — all computed locally, no external API.</p>
+            <div id="analysisBody">
+              <div class="empty-state"><span class="big">◎</span>Run a scan to see your<br/>ATS score & suggestions</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel job-search-panel" id="jobSearchPanel" style="margin-top:18px;">
+          <h2>06 · Find Matching Jobs — Live Search</h2>
+          <p class="sub">Analyzes your resume (title + skills) and lists live matching jobs right here on this page, ranked by match %. Click Apply only when you want to open a posting.</p>
+          <div class="job-search-row" id="jobSearchRow"></div>
+        </div>
+      </div>
+      <footer class="credit">ATS Resume Builder — Final Year Project · Rule-based ATS engine, no external AI API</footer>
+    </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= PUBLIC SHARE VIEW (no login required) ================= -->
+<div id="page-public" class="page" style="display:none;">
+  <div class="public-view-wrap">
+    <div class="public-view-bar">
+      <div class="auth-brand"><div class="mark">ATS</div><h1>ATS Resume Builder</h1></div>
+      <button class="btn-secondary" onclick="window.print()">🖨 Print</button>
+    </div>
+    <div id="publicPreviewHost"></div>
+  </div>
+</div>
+
+<!-- ================= HELP CHATBOT (rule-based, no external AI) ================= -->
+<button class="chat-fab" id="chatFab" onclick="toggleChat()">💬</button>
+<div class="chat-panel" id="chatPanel" style="display:none;">
+  <div class="chat-header">
+    <div>
+      <div class="chat-title">ATS Resume Builder Help</div>
+      <div class="chat-sub">Rule-based FAQ bot — no AI</div>
+    </div>
+    <button class="chat-close" onclick="toggleChat()">✕</button>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-quick" id="chatQuick"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Ask a question…" onkeydown="if(event.key==='Enter') sendChatMessage()" />
+    <button class="chat-send" onclick="sendChatMessage()">➤</button>
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script src="v2.js"></script>
+</body>
+</html>
